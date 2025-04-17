@@ -15,11 +15,12 @@ vendor/
 # =========================
 node_modules/
 package-lock.json
+package.json
+tailwind.config.js
 
 # Archivos generados por Tailwind
-/public/assets/css/tailwind.css
-/public/assets/css/tailwind.min.css
-/src/
+/frontend/public/css/output.css
+/frontend/public/css/input.css
 
 # =========================
 # Editor / Sistema

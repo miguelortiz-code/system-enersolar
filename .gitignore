@@ -19,7 +19,7 @@ package.json
 tailwind.config.js
 
 # Archivos generados por Tailwind
-/frontend/public/css/output.css
+# /frontend/public/css/output.css
 /frontend/public/css/input.css
 
 # =========================

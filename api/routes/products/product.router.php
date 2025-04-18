@@ -8,6 +8,7 @@ $router->get('/products', function () {
   
     echo json_encode([
         'success' => true,
+        'total' => count($products),
         'data' => $products
     ]);
 });

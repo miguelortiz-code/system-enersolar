@@ -8,6 +8,7 @@ $router->get('/categories', function(){
 
     echo json_encode([
         'success' => true,
+        'total' => count($categories),
         'data' => $categories
     ]);
 });

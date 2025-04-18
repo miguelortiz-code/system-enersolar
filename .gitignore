@@ -14,13 +14,8 @@ vendor/
 # Node / Tailwind CLI
 # =========================
 node_modules/
-package-lock.json
-package.json
-tailwind.config.js
 
 # Archivos generados por Tailwind
-# /frontend/public/css/output.css
-/frontend/public/css/input.css
 
 # =========================
 # Editor / Sistema

@@ -18,19 +18,22 @@ class Router{
     }
 
     private function addRoute($method, $path, $controller){
+        $regex = preg_replace('/\{([a-zA-Z0-9_]+)\}/', '(?P<\1>[a-zA-Z0-9_-]+)', $path);
+        $regex = '#^' . $regex . '$#';
         $this->routes[] = [
             'method' => $method,
-            'path' => $path,
+            'path' => $regex,
             'controller' => $controller
         ];
     }
 
     public function run(){
         $requestMethod = $_SERVER['REQUEST_METHOD'];
-        $requestUri = $_SERVER['REQUEST_URI'];
+        $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
         foreach($this->routes as $route){
-            if($route['method'] === $requestMethod && $route['path'] === $requestUri){
-                call_user_func($route['controller']);
+            if($route['method'] === $requestMethod && preg_match($route['path'], $requestUri, $matches)){
+                $params = array_filter($matches, 'is_string', ARRAY_FILTER_USE_KEY);
+                call_user_func($route['controller'], $params);
                 return;
             }
         }
@@ -42,5 +45,3 @@ class Router{
 }
 
 $router  = new Router();
-require_once 'routes/products/product.router.php';
-require_once 'routes/categories/category.router.php';

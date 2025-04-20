@@ -2,6 +2,7 @@
 
 require_once 'models/models.php';
 require_once 'helpers/helper.global.php';
+require_once 'helpers/jwt.helper.php';
 
 class Controller
 {
@@ -72,8 +73,11 @@ class Controller
     // ===================================================================
     public function update($id, $data)
     {
+
+        $userData = $this->validateToken();
+
         // Primero, verifiquemos si el registro existe antes de intentar actualizarlo
-        if(!$this->model->getById($id)){
+        if (!$this->model->getById($id)) {
             http_response_code(404);
             echo json_encode([
                 'Error' => true,
@@ -84,13 +88,13 @@ class Controller
 
         // ENCRIPTAR LA CONTRASEÑA ANTES DE ACTUALIZAR
 
-        if(isset($data['password'])){
+        if (isset($data['password'])) {
             $data['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
         }
 
 
         // ACTUALIZAR EL REGISTRO
-        if($this->model->update($id, $data)){
+        if ($this->model->update($id, $data)) {
             $message = $this->getCreateMessage();
             echo json_encode([
                 'success' => true,
@@ -113,7 +117,7 @@ class Controller
     public function delete($id)
     {
         // Verificamos si el registro existe antes de intentar eliminarlo
-        if(!$this->model->getById($id)){
+        if (!$this->model->getById($id)) {
             http_response_code(404);
             echo json_encode([
                 'Error' => true,
@@ -123,7 +127,7 @@ class Controller
         }
 
         // Procedemos a eliminar el registro
-        if($this->model->delete($id)){
+        if ($this->model->delete($id)) {
             $message = $this->getCreateMessage();
             echo json_encode([
                 'success' => true,
@@ -158,14 +162,36 @@ class Controller
         }
 
         if (password_verify($password, $user['password'])) {
-            session_start();
-            $_SESSION['user'] = $user;
-            echo json_encode([
-                'status' => 200,
-                'success' => true,
-                'Message' => 'Inicio de sesión exitoso'
-            ]);
-        } else {
+
+            $playload = [
+                'id' => $user['id_user'],
+                'email' => $user['email'],
+                'id_rol' => $user['id_rol'] ?? 'cliente'
+            ];
+
+            // Genera el token
+            $token = JwtHelper::generateToken($playload);
+
+            // Actualizar el token en la base de datos
+            $updateToken = $userModel->updateTokenUser($user['id_user'], $token);
+            if ($updateToken) {
+
+                session_start();
+                $_SESSION['user'] = $user;
+                echo json_encode([
+                    'status' => 200,
+                    'success' => true,
+                    'Message' => 'Inicio de sesión exitoso',
+                    'Token' => $token
+                ]);
+            }else{
+                echo json_encode([
+                    'Status' => 500,
+                    'Error' => true,
+                    'Message' => 'Hubo un problema al actualizar el token',
+                ]);
+            } 
+        }else {
             echo json_encode([
                 'status' => 400,
                 'error' => true,
@@ -233,7 +259,7 @@ class Controller
         }
 
 
-        if($data['email'] && !filter_var($data['email'], FILTER_VALIDATE_EMAIL)){
+        if (isset($data['email']) && !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
             http_response_code(400);
             echo json_encode([
                 'error' => true,
@@ -262,5 +288,26 @@ class Controller
         $name = translateTableToSpanish($this->table);
 
         return "$name $action correctamente";
+    }
+
+
+
+    private function validateToken()
+    {
+        $headers = getallheaders();
+        $token  = $headers['Authorizacion'] ?? null;
+
+        $result = JwtHelper::verifyToken($token);
+
+        if (!$result['success']) {
+            http_response_code(401);
+            echo json_encode([
+                'Error' => true,
+                'Message' =>  $result['error']
+            ]);
+            exit;
+        }
+
+        return $result['data'];
     }
 }

@@ -112,7 +112,7 @@ class Model
 
     public function getUserByEmail($email){
         try{    
-            $stmt = $this->db->prepare("SELECT email, password FROM {$this->table} WHERE email = :email");
+            $stmt = $this->db->prepare("SELECT id_user, email, password, id_rol FROM {$this->table} WHERE email = :email");
             $stmt->bindParam(':email', $email);
             $stmt->execute();
             return $stmt->fetch(PDO::FETCH_ASSOC);
@@ -124,5 +124,15 @@ class Model
     }
 
 
-
+    public function updateTokenUser($id_user, $token){
+        try{
+            $stmt = $this->db->prepare("UPDATE {$this->table} SET token = :token WHERE {$this->primaryKey} = :id ");
+            $stmt->bindParam(':token', $token);
+            $stmt->bindParam(':id', $id_user);
+            return $stmt->execute();
+        }catch(PDOException $e){
+            error_log($e->getMessage());
+            return false;
+        }
+    }
 }

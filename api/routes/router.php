@@ -19,6 +19,7 @@ class Router {
     }
 
     private function addRoute($method, $path, $controller) {
+        // Convert {param} to (?P<param>...)
         $regex = preg_replace('/\{([a-zA-Z0-9_]+)\}/', '(?P<\1>[a-zA-Z0-9_-]+)', $path);
         $regex = '#^' . $regex . '$#';
         $this->routes[] = [
@@ -35,7 +36,18 @@ class Router {
         foreach ($this->routes as $route) {
             if ($route['method'] === $requestMethod && preg_match($route['path'], $requestUri, $matches)) {
                 $params = array_filter($matches, 'is_string', ARRAY_FILTER_USE_KEY);
-                call_user_func($route['controller'], $params);
+                
+                // Verificar si el controlador es una clase y necesita ser instanciada
+                if (is_array($route['controller'])) {
+                    $controllerClass = $route['controller'][0];
+                    $controllerMethod = $route['controller'][1];
+                    $controller = new $controllerClass();
+                    call_user_func([$controller, $controllerMethod], $params);
+                } else {
+                    // Si es una función global
+                    call_user_func($route['controller'], $params);
+                }
+
                 return;
             }
         }
@@ -43,11 +55,9 @@ class Router {
         http_response_code(404);
         echo json_encode([
             'error' => true,
-            'message' => 'La ruta solicitada no se encuentra en el servidor.' . $requestUri
-            ]);
+            'message' => 'La ruta solicitada no se encuentra en el servidor' . $requestUri
+        ]);
     }
 }
 
 $router = new Router();
-require_once 'routes/routes.php';
-$router->run();

@@ -27,7 +27,9 @@ node_modules/
 *.swp
 *.bak
 Thumbs.db
-
+fontawesome/
+fontawesome/css
+fontawesome/svgs
 # =========================
 # Otros
 # =========================

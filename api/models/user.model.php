@@ -2,7 +2,7 @@
 
 require_once 'config/connection.php';
 
-class userModel
+class UserModel
 {
     private $pdo;
 
@@ -11,24 +11,35 @@ class userModel
         $this->pdo = Connection::getConnection();
     }
 
-    // =====================================================
-    //                   CREAR UN USUARIO
-    // =====================================================
-    public function insertUser($data)
+    public function createUser($data)
     {
+        $query = "INSERT INTO users (code_user, first_name, second_name, first_surname, second_surname, email, password, phone, address)
+                  VALUES (:code, :first_name, :second_name, :first_surname, :second_surname, :email, :password, :phone, :address)";
         try {
-            $query = "INSERT INTO users (
-                code_user, first_name, second_name, first_surname, second_surname,
-                image, address, email, password, phone, token, method,
-                id_rol, id_state, super_root
-            ) VALUES (
-                :code, :first_name, :second_name, :first_surname, :second_surname,
-                :image, :address, :email, :password, :phone, :token, :method,
-                :id_rol, :id_state, :super_root
-            )";
             $stmt = $this->pdo->prepare($query);
-
             $stmt->bindParam(':code', $data['code_user']);
+            $stmt->bindParam(':first_name', $data['first_name']);
+            $stmt->bindParam(':second_name', $data['second_name']);
+            $stmt->bindParam(':first_surname', $data['first_surname']);
+            $stmt->bindParam(':second_surname', $data['second_surname']);
+            $stmt->bindParam(':email', $data['email']);
+            $stmt->bindParam(':password', $data['password']);
+            $stmt->bindParam(':phone', $data['phone']);
+            $stmt->bindParam(':address', $data['address']);
+            return $stmt->execute();
+        } catch (PDOException $e) {
+            throw new Exception('Error al registrar el usuario: ' . $e->getMessage());
+        }
+    }
+
+    public function updateUser($id, $data)
+    {
+        $query = "UPDATE users SET  first_name = :first_name, second_name = :second_name, first_surname = :first_surname, 
+        second_surname = :second_surname, image = :image, address = :address, email = :email, password = :password, phone = :phone, 
+        id_rol = :id_rol, id_state = :id_state  WHERE id_user = :id";
+        try {
+            $stmt = $this->pdo->prepare($query);
+            $stmt->bindParam(':id', $id);
             $stmt->bindParam(':first_name', $data['first_name']);
             $stmt->bindParam(':second_name', $data['second_name']);
             $stmt->bindParam(':first_surname', $data['first_surname']);
@@ -38,180 +49,119 @@ class userModel
             $stmt->bindParam(':email', $data['email']);
             $stmt->bindParam(':password', $data['password']);
             $stmt->bindParam(':phone', $data['phone']);
-            $stmt->bindParam(':token', $data['token']);
-            $stmt->bindParam(':method', $data['method']);
             $stmt->bindParam(':id_rol', $data['id_rol']);
             $stmt->bindParam(':id_state', $data['id_state']);
-            $stmt->bindParam(':super_root', $data['super_root']);
-
             return $stmt->execute();
         } catch (PDOException $e) {
-            // Log or handle error
-            return false;
+            throw new Exception('Error al actualizar el usuario: ' . $e->getMessage());
         }
     }
 
-    // =====================================================
-    //                   OBTENER TODOS LOS USUARIOS
-    // =====================================================
-    public function getAllUsers()
+    public function deleteUser($id)
     {
+        $query = "DELETE FROM users WHERE id_user = :id";
         try {
-            $query = "SELECT * FROM users";
             $stmt = $this->pdo->prepare($query);
+            $stmt->bindParam(':id', $id);
+            return $stmt->execute();
+        } catch (PDOException $e) {
+            throw new Exception('Error al eliminar el usuario: ' . $e->getMessage());
+        }
+    }
+
+    public function getAllUsers($limit = 10, $offset = 0)
+    {
+        $query = "SELECT * FROM users LIMIT :limit OFFSET :offset";
+        try {
+            $stmt = $this->pdo->prepare($query);
+            $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
+            $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
             $stmt->execute();
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
-            return [];
+            throw new Exception('Error al obtener los usuarios: ' . $e->getMessage());
         }
     }
 
-    // =====================================================
-    //                   OBTENER USUARIO POR ID
-    // =====================================================
     public function getUserById($id)
     {
+        $query = "SELECT code_user, first_name, second_name, first_surname, second_surname, email, phone, address FROM users WHERE id_user = :id";
         try {
-            $query = "SELECT * FROM users WHERE id_user = :id";
             $stmt = $this->pdo->prepare($query);
             $stmt->bindParam(':id', $id);
             $stmt->execute();
             return $stmt->fetch(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
-            return null;
+            throw new Exception('Error al obtener el usuario por ID: ' . $e->getMessage());
         }
     }
 
-    // =====================================================
-    //                   ACTUALIZAR USUARIO
-    // =====================================================
-    public function updateUser($id, $data)
+    public function getUsersByFilters($filters = [])
     {
-        try {
-            $query = "UPDATE users SET
-                code_user = :code, first_name = :first_name, second_name = :second_name,
-                first_surname = :first_surname, second_surname = :second_surname,
-                image = :image, address = :address, email = :email, password = :password,
-                phone = :phone, token = :token, method = :method, id_rol = :id_rol,
-                id_state = :id_state, super_root = :super_root
-                WHERE id_user = :id";
+        $query = "SELECT * FROM users WHERE 1=1";
+        $params = [];
 
+        if (isset($filters['email']) && trim($filters['email']) !== '') {
+            $query .= " AND LOWER(email) LIKE :email";
+            $params[':email'] = "%" . strtolower($filters['email']) . "%";
+        }
+
+        if (isset($filters['first_name']) && trim($filters['first_name']) !== '') {
+            $query .= " AND LOWER(first_name) LIKE :first_name";
+            $params[':first_name'] = "%" . strtolower($filters['first_name']) . "%";
+        }
+
+        if (isset($filters['second_name']) && trim($filters['second_name']) !== '') {
+            $query .= " AND LOWER(second_name) LIKE :second_name";
+            $params[':second_name'] = "%" . strtolower($filters['second_name']) . "%";
+        }
+
+        if (isset($filters['id_rol']) && trim($filters['id_rol']) !== '') {
+            $query .= " AND id_rol = :id_rol";
+            $params[':id_rol'] = $filters['id_rol'];
+        }
+
+        if (isset($filters['id_state']) && trim($filters['id_state']) !== '') {
+            $query .= " AND id_state = :id_state";
+            $params[':id_state'] = $filters['id_state'];
+        }
+
+        try {
             $stmt = $this->pdo->prepare($query);
-
-            $stmt->bindParam(':id', $id);
-            $stmt->bindParam(':code', $data['code_user']);
-            $stmt->bindParam(':first_name', $data['first_name']);
-            $stmt->bindParam(':second_name', $data['second_name']);
-            $stmt->bindParam(':first_surname', $data['first_surname']);
-            $stmt->bindParam(':second_surname', $data['second_surname']);
-            $stmt->bindParam(':image', $data['image']);
-            $stmt->bindParam(':address', $data['address']);
-            $stmt->bindParam(':email', $data['email']);
-            $stmt->bindParam(':password', $data['password']);
-            $stmt->bindParam(':phone', $data['phone']);
-            $stmt->bindParam(':token', $data['token']);
-            $stmt->bindParam(':method', $data['method']);
-            $stmt->bindParam(':id_rol', $data['id_rol']);
-            $stmt->bindParam(':id_state', $data['id_state']);
-            $stmt->bindParam(':super_root', $data['super_root']);
-
-            return $stmt->execute();
+            foreach ($params as $key => $value) {
+                $stmt->bindValue($key, $value);
+            }
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
-            return false;
+            throw new Exception('Error al filtrar usuarios: ' . $e->getMessage());
         }
     }
 
-    // =====================================================
-    //                   ELIMINAR USUARIO
-    // =====================================================
-    public function deleteUser($id)
+    public function isCodeUserExists($code)
     {
+        $query = "SELECT COUNT(code_user) FROM users WHERE code_user = :code";
         try {
-            $query = "DELETE FROM users WHERE id_user = :id";
             $stmt = $this->pdo->prepare($query);
-            $stmt->bindParam(':id', $id);
-            return $stmt->execute();
+            $stmt->bindParam(':code', $code);
+            $stmt->execute();
+            return $stmt->fetchColumn() > 0;
         } catch (PDOException $e) {
-            return false;
+            throw new Exception('Error al verificar el código de usuario: ' . $e->getMessage());
         }
     }
 
-    // =====================================================
-    //                   VERIFICAR EMAIL
-    // =====================================================
-    public function emailExists($email)
+
+    public function existingEmail($email)
     {
+        $query = "SELECT 1 FROM users WHERE email = :email LIMIT 1";
         try {
-            $query = "SELECT COUNT(*) FROM users WHERE email = :email";
             $stmt = $this->pdo->prepare($query);
             $stmt->bindParam(':email', $email);
             $stmt->execute();
             return $stmt->fetchColumn() > 0;
         } catch (PDOException $e) {
-            return false;
+            throw new Exception('Error al verificar el correo del usuario: ' . $e->getMessage());
         }
     }
-
-    // =====================================================
-    //                  BUSQUEDA CON FILTROS
-    // =====================================================
-    public function getUsersByFilters($filters)
-    {
-        $sql = "SELECT * FROM users WHERE 1=1";
-        $params = [];
-
-        if (!empty($filters['first_name'])) {
-            $sql .= " AND first_name LIKE ?";
-            $params[] = "%" . $filters['first_name'] . "%";
-        }
-
-        if (!empty($filters['second_name'])) {
-            $sql .= " AND second_name LIKE ?";
-            $params[] = "%" . $filters['second_name'] . "%";
-        }
-
-        if (!empty($filters['first_surname'])) {
-            $sql .= " AND first_surname LIKE ?";
-            $params[] = "%" . $filters['first_surname'] . "%";
-        }
-
-        if (!empty($filters['second_surname'])) {
-            $sql .= " AND second_surname LIKE ?";
-            $params[] = "%" . $filters['second_surname'] . "%";
-        }
-
-        if (!empty($filters['email'])) {
-            $sql .= " AND email LIKE ?";
-            $params[] = "%" . $filters['email'] . "%";
-        }
-
-        if (!empty($filters['id_rol'])) {
-            $sql .= " AND id_rol = ?";
-            $params[] = $filters['id_rol'];
-        }
-
-        if (!empty($filters['id_state'])) {
-            $sql .= " AND id_state = ?";
-            $params[] = $filters['id_state'];
-        }
-
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    // =====================================================
-    //                  OBTENER USUARIO POR EMAIL
-    // =====================================================
-    public function getUserByEmail($email){    
-    try{
-        $query = "SELECT id_user, first_name, email, password, token FROM users WHERE email = :email";
-        $stmt = $this->pdo->prepare($query);
-        $stmt->bindParam(':email', $email);
-        $stmt->execute();
-        return $stmt->fetch(PDO::FETCH_ASSOC);
-    }catch (PDOException $e) {
-        return false;
-    }
-}
 }

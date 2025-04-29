@@ -1,304 +1,250 @@
 <?php
 require_once 'models/user.model.php';
-require_once 'helpers/helper.global.php';
+require_once 'helpers/response.php';
+require_once 'middleware/auth.middleware.php';
 
-class userController
+class UserController
 {
-    private $userModel;
+    private $model;
 
     public function __construct()
     {
-        $this->userModel = new userModel();
+        $this->model = new userModel();
     }
 
-    // =====================================================
-    //                   CREAR UN USUARIO
-    // =====================================================
+    // ==========================================
+    // OBTENER USUARIO POR ID
+    // ==========================================
+    public function getUserById($id)
+    {
+
+        // Asegurar que el usuario está autenticado
+        AuthMiddleware::handle();
+
+        $data = Response::json();
+
+        if (!$id) {
+            Response::error("ID de usuario no proporcionado", 400);
+            return;
+        }
+
+        $user = $this->model->getUserById($id);
+        if (!$user) {
+            Response::error("No se ha encontrado ningun usuario con el id: {$id}", 404);
+            return;
+        }
+
+        Response::success([
+            'message' => 'Usuario encontrado',
+            'data' => $user
+        ]);
+    }
+
+    // ==========================================
+    // CREAR UN USUARIO
+    // ==========================================
     public function createUser()
     {
-        $data = json();
 
-        // Lista de campos requeridos
-        $requiredFields = [
-            'code_user',
-            'first_name',
-            'second_name',
-            'first_surname',
-            'second_surname',
-            'image',
-            'address',
-            'email',
-            'password',
-            'phone',
-            'token',
-            'method',
-            'id_rol',
-            'id_state',
-            'super_root'
-        ];
+        AuthMiddleware::handle();
+        $data = Response::json();
 
-        foreach ($requiredFields as $field) {
-            if (!array_key_exists($field, $data)) {
-                echo json_encode([
-                    "Status" => 400,
-                    "Error" => true,
-                    "Message" => "Campo requerido faltante: $field"
-                ]);
+        // Campos requeridos
+        $required = ['first_name', 'second_name', 'first_surname', 'second_surname', 'email', 'password', 'phone', 'address'];
+        foreach ($required as $field) {
+            if (empty($data[$field])) {
+                Response::error("El campo $field es obligatorio", 400);
                 return;
             }
         }
 
-        // Procesamiento de datos
-        $codeUser = htmlspecialchars(trim($data['code_user']));
-        $first_name = htmlspecialchars(trim($data['first_name']));
-        $second_name = htmlspecialchars(trim($data['second_name']));
-        $first_surname = htmlspecialchars(trim($data['first_surname']));
-        $second_surname = htmlspecialchars(trim($data['second_surname']));
-        $image = htmlspecialchars(trim($data['image']));
-        $address = htmlspecialchars(trim($data['address']));
-        $email = htmlspecialchars(trim($data['email']));
-        $password = htmlspecialchars(trim($data['password']));
-        $phone = htmlspecialchars(trim($data['phone']));
-        $token = !empty($data['token']) ? htmlspecialchars(trim($data['token'])) : '';
-        $method = !empty($data['method']) ? htmlspecialchars(trim($data['method'])) : '';
-        $id_rol = htmlspecialchars(trim($data['id_rol']));
-        $id_state = htmlspecialchars(trim($data['id_state']));
-        $super_root = htmlspecialchars(trim($data['super_root']));
-
-        // Validación del email
-        if ($this->userModel->emailExists($email)) {
-            echo json_encode([
-                "Status" => 400,
-                "Error" => true,
-                "Message" => "El correo ya se encuentra registrado"
-            ]);
-            return;
-        }
-
-        // Validación de contraseña
-        if (empty($password)) {
-            echo json_encode([
-                "Status" => 400,
-                "Error" => true,
-                "Message" => "La contraseña no puede estar vacía"
-            ]);
-            return;
-        }
-        $hashPassword = password_hash($password, PASSWORD_DEFAULT);
-
-        // Datos del usuario
-        $userData = [
-            'code_user' => $codeUser,
-            'first_name' => $first_name,
-            'second_name' => $second_name,
-            'first_surname' => $first_surname,
-            'second_surname' => $second_surname,
-            'image' => $image,
-            'address' => $address,
-            'email' => $email,
-            'password' => $hashPassword,
-            'phone' => $phone,
-            'token' => $token,
-            'method' => $method,
-            'id_rol' => $id_rol,
-            'id_state' => $id_state,
-            'super_root' => $super_root
+        // Limpiar y sanitizar los datos de entrada
+        $clearData = [
+            'code_user' => $this->generateCode(),
+            'first_name'  =>  htmlspecialchars(trim(strip_tags($data['first_name']))),
+            'second_name' =>  htmlspecialchars(trim(strip_tags($data['second_name']))),
+            'first_surname' =>  htmlspecialchars(trim(strip_tags($data['first_surname']))),
+            'second_surname' =>  htmlspecialchars(trim(strip_tags($data['second_surname']))),
+            'email' =>  htmlspecialchars(trim(strip_tags($data['email']))),
+            'password' =>  filter_var(trim(strip_tags($data['password'])), FILTER_SANITIZE_EMAIL),
+            'phone' =>  preg_replace('/[^0-9]/', '', $data['phone']),
+            'address' =>  htmlspecialchars(trim(strip_tags($data['address']))),
         ];
 
-        // Insertar usuario
-        $result = $this->userModel->insertUser($userData);
+        // Validar el formato del correo
+        if (!filter_var($clearData['email'], FILTER_VALIDATE_EMAIL)) {
+            Response::error('El correo no tiene un formato valido', 400);
+        }
+
+        // Hashear la contraseña
+        $clearData['password'] =  password_hash($data['password'], PASSWORD_BCRYPT);
+
+        // Validar si el correo ya está registrado
+        if ($this->model->existingEmail($clearData['email'])) {
+            Response::error('El correo ya se encuentra registrado', 409);
+        }
+
+        // Registrar al usuario
+        $result = $this->model->createUser($clearData);
+
+        // Verificar si el registro fue exitoso
+        if ($result) {
+            Response::success(['message' => 'Usuario registrado con éxito']);
+        } else {
+            Response::error('No se pudo registrar el usuario', 500);
+        }
+    }
+
+
+    // ==========================================
+    // ACTUALIZAR UN USUARIO
+    // ==========================================
+    public function updateUser($id)
+    {
+        // Asegurar que el usuario está autenticado
+        AuthMiddleware::handle();
+
+        $data = Response::json();
+
+        if (!$id) {
+            Response::error("ID de usuario no proporcionado", 400);
+            return;
+        }
+
+        $user = $this->model->getUserById($id);
+        if (!$user) {
+            Response::error("No se ha encontrado ningun usuario con el id: {$id}", 404);
+            return;
+        }
+
+        // Validar que se proporcionen los campos necesarios
+        $required = ['first_name', 'second_name', 'first_surname', 'second_surname', 'email', 'password', 'phone', 'address'];
+        foreach ($required as $field) {
+            if (empty($data[$field])) {
+                Response::error("El campo $field es obligatorio", 400);
+                return;
+            }
+        }
+
+        // Limpiar datos y asignar valores
+        $clearData = [
+            'code_user' => $data['code_user'],
+            'first_name'  =>  htmlspecialchars(trim(strip_tags($data['first_name']))),
+            'second_name' =>  htmlspecialchars(trim(strip_tags($data['second_name']))),
+            'first_surname' =>  htmlspecialchars(trim(strip_tags($data['first_surname']))),
+            'second_surname' =>  htmlspecialchars(trim(strip_tags($data['second_surname']))),
+            'email' =>  htmlspecialchars(trim(strip_tags($data['email']))),
+            'phone' =>  preg_replace('/[^0-9]/', '', $data['phone']),
+            'address' =>  htmlspecialchars(trim(strip_tags($data['address']))),
+        ];
+
+        // Si la contraseña está presente, entonces la hasheamos
+        if (!empty($data['password'])) {
+            $clearData['password'] = password_hash($data['password'], PASSWORD_BCRYPT);
+        } else {
+            // Si no hay nueva contraseña, mantenemos la anterior
+            $clearData['password'] = $user['password'];
+        }
+
+        // Actualizar usuario
+        $result = $this->model->updateUser($id, $clearData);
 
         if ($result) {
-            echo json_encode([
-                "Status" => 200,
-                "Success" => true,
-                "Message" => "Usuario registrado con éxito"
-            ]);
+            Response::success(['message' => 'Usuario actualizado exitosamente']);
         } else {
-            echo json_encode([
-                "Status" => 400,
-                "Error" => true,
-                "Message" => "Error al registrar el usuario"
-            ]);
+            Response::error('No se pudo actualizar el usuario', 500);
         }
     }
-    // =====================================================
-    //               OBTENER TODOS LOS USUARIOS
-    // =====================================================
-    public function index()
+
+
+    // ==========================================
+    // ELIMINAR UN USUARIO
+    // ==========================================
+    public function deleteUser($id)
     {
-        $users = $this->userModel->getAllUsers();
-        echo json_encode([
-            'Status' => 200,
-            'Success' => true,
-            'total' => count($users),
-            'Data' => $users
-        ]);
-    }
+        // Asegurar que el usuario está autenticado
+        AuthMiddleware::handle();
 
-    // =====================================================
-    //               OBTENER USUARIO POR ID
-    // =====================================================
-    public function show($params)
-    {
-        $id = $params['id'];
-        $user = $this->userModel->getUserById($id);
+        if (!$id) {
+            Response::error("ID de usuario no proporcionado", 400);
+            return;
+        }
 
-
+        $user = $this->model->getUserById($id);
         if (!$user) {
-            echo json_encode([
-                'Status' => 404,
-                'Error' => true,
-                'Message' => 'Usuario no encontrado'
-            ]);
+            Response::error("No se ha encontrado ningun usuario con el id: {$id}", 404);
             return;
         }
 
-        echo json_encode([
-            'Status' => 200,
-            'Success' => true,
-            'Data' => $user
-        ]);
-    }
+        $result = $this->model->deleteUser($id);
 
-    // =====================================================
-    //               ACTUALIZAR USUARIO
-    // =====================================================
-    public function updateUser($params)
-    {
-        $id = $params['id'];
-        $data = json(); // <- Aquí recuperamos los datos directamente
-
-        $userData = [
-            'code_user' => htmlspecialchars(trim($data['code_user'] ?? '')),
-            'first_name' => htmlspecialchars(trim($data['first_name'] ?? '')),
-            'second_name' => htmlspecialchars(trim($data['second_name'] ?? '')),
-            'first_surname' => htmlspecialchars(trim($data['first_surname'] ?? '')),
-            'second_surname' => htmlspecialchars(trim($data['second_surname'] ?? '')),
-            'image' => htmlspecialchars(trim($data['image'] ?? '')),
-            'address' => htmlspecialchars(trim($data['address'] ?? '')),
-            'email' => htmlspecialchars(trim($data['email'] ?? '')),
-            'password' => isset($data['password']) ? password_hash(trim($data['password']), PASSWORD_DEFAULT) : '',
-            'phone' => htmlspecialchars(trim($data['phone'] ?? '')),
-            'token' => htmlspecialchars(trim($data['token'] ?? '')),
-            'method' => htmlspecialchars(trim($data['method'] ?? '')),
-            'id_rol' => htmlspecialchars(trim($data['id_rol'] ?? '')),
-            'id_state' => htmlspecialchars(trim($data['id_state'] ?? '')),
-            'super_root' => htmlspecialchars(trim($data['super_root'] ?? ''))
-        ];
-
-        $result = $this->userModel->updateUser($id, $userData);
-
-        if (!$result) {
-            echo json_encode([
-                'Status' => 400,
-                'Error' => true,
-                'Message' => 'No se pudo actualizar el usuario'
-            ]);
-            return;
+        if ($result) {
+            Response::success(['message' => 'Usuario eliminado exitosamente']);
+        } else {
+            Response::error('No se pudo eliminar el usuario', 500);
         }
+    }
 
-        echo json_encode([
-            'Status' => 200,
-            'Success' => true,
-            'Message' => 'Usuario actualizado correctamente'
+    // Obtener todos los usuarios con paginación
+    public function getAllUsers($page = 1)
+    {
+        // Asegurar que el usuario está autenticado
+        AuthMiddleware::handle();
+
+        $limit = 10;  // Número de usuarios por página
+        $offset = ($page - 1) * $limit;
+
+        $users = $this->model->getAllUsers($limit, $offset);
+
+        Response::success([
+            'message' => 'Usuarios obtenidos exitosamente',
+            'users' => $users
         ]);
     }
 
-
-    // =====================================================
-    //               ELIMINAR USUARIO
-    // =====================================================
-    public function deleteUser($params)
+    // ==========================================
+    // FILTRO DE USUARIOS
+    // ==========================================
+    public function getUsersByFilters()
     {
-        $id = $params['id'];
+        // Asegurar que el usuario está autenticado
+        AuthMiddleware::handle();
 
-        $result = $this->userModel->deleteUser($id);
 
-        if (!$result) {
-            echo json_encode([
-                'Status' => 400,
-                'Error' => true,
-                'Message' => 'No se pudo eliminar el usuario'
-            ]);
-            return;
-        }
-
-        echo json_encode([
-            'Status' => 200,
-            'Success' => true,
-            'Message' => 'Usuario eliminado correctamente'
-        ]);
-    }
-
-    // =====================================================
-    //               BUSQUEDA CON FILTROS
-    // =====================================================
-    public function filterUsers()
-    {
         $filters = $_GET;
 
-        $users = $this->userModel->getUsersByFilters($filters);
-
-        if ($users) {
-            echo json_encode([
-                'Status' => 200,
-                'Success' => true,
-                'total' => count($users),
-                'Data' => $users
-            ]);
-        } else {
-            echo json_encode([
-                'Status' => 400,
-                'error' => true,
-                'total' => count($users),
-                'Message' => 'No se han encontrado usuarios con esos parametros'
-            ]);
+        if (isset($_GET['email']) && trim($_GET['email']) !== '') {
+            $filters['email'] = $_GET['email'];
         }
+
+        if (isset($_GET['first_name']) && trim($_GET['first_name']) !== '') {
+            $filters['first_name'] = $_GET['first_name'];
+        }
+
+        if (isset($_GET['id_rol']) && trim($_GET['id_rol']) !== '') {
+            $filters['id_rol'] = $_GET['id_rol'];
+        }
+
+        if (isset($_GET['id_state']) && trim($_GET['id_state']) !== '') {
+            $filters['id_state'] = $_GET['id_state'];
+        }
+
+        $users = $this->model->getUsersByFilters($filters);
+
+        Response::success([
+            'message' => 'Usuarios filtrados obtenidos',
+            'users' => $users
+        ]);
     }
 
-    public function loginUser()
+    // ==========================================
+    // GENERAR CODIGO PARA USUARIO
+    // ==========================================
+    private function generateCode()
     {
-        $data = json();
-        if (!isset($data['email']) && !isset($data['password'])) {
-            echo json_encode([
-                'Status' => 400,
-                'error' => true,
-                'Message' => 'El correo y la contraseña son requeridos'
-            ]);
-            return;
-        }
-
-        $email =  htmlspecialchars(trim($data['email']));
-        $password = htmlspecialchars(trim($data['password']));
-        $user =  $this->userModel->getUserByEmail($email);
-
-        if (!$user) {
-            echo json_encode([
-                'Status' => 400,
-                'error' => true,
-                'Message' => 'Usuario no se encuentra registrado'
-            ]);
-            return;
-        }
-
-        if (password_verify($password, $user['password'])) {
-            echo json_encode([
-                'Status' => 200,
-                'success' => true,
-                'Message' => 'Login exitoso',
-                'Data' => [
-                    'user_id' => $user['id_user'],
-                    'email' => $user['email'],
-                    'first_name' => $user['first_name']
-                ]
-            ]);
-        } else {
-            echo json_encode([
-                'Status' => 400,
-                'error' => true,
-                'Message' => 'La contraseña es incorrecta'
-            ]);
-        }
+        do {
+            $code =  random_int(100, 999); // Genera un código entre 100 y 999
+        } while ($this->model->isCodeUserExists($code)); // Asegura que el código sea único
+        return $code;
     }
 }

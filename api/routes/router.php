@@ -45,7 +45,7 @@ class Router {
                     call_user_func([$controller, $controllerMethod], $params);
                 } else {
                     // Si es una función global
-                    call_user_func($route['controller'], $params);
+                    call_user_func_array($route['controller'], array_values($params));
                 }
 
                 return;

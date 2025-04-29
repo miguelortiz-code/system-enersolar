@@ -1,50 +1,35 @@
 <?php
-
 require_once 'controllers/user.controller.php';
 require_once 'routes/router.php';
 
-// Obtener todos los usuarios
-$router->get('/users', function () {
-    $controller = new userController();
+$router->get('/api/users/{id}', function($id){
+    $controller = new UserController();
+    $controller->getUserById($id);
+});
+
+// Ruta GET con lógica condicional para filtrar
+$router->get('/api/users', function(){
+    $controller = new UserController();
+    // Verificar si hay filtros en la consulta
     if (!empty($_GET)) {
-        $controller->filterUsers();
+        $controller->getUsersByFilters();
     } else {
-        $controller->index();
+        $controller->getAllUsers();
     }
 });
 
-// Obtener un usuario por ID
-$router->get('/user/{id}', function ($params) {
-    $controller = new userController();
-    $controller->show($params);
-});
 
-// Crear un nuevo usuario
-$router->post('/user', function () {
-    $controller = new userController();
+$router->post('/api/users', function(){
+    $controller = new UserController();
     $controller->createUser();
 });
 
-// Actualizar un usuario por ID
-$router->put('/user/{id}', function ($params) {
-    $controller = new userController();
-    $controller->updateUser($params);
+$router->put('/api/users/{id}', function($id){
+    $controller = new UserController();
+    $controller->updateUser($id);
 });
 
-// Eliminar un usuario por ID
-$router->delete('/user/{id}', function ($params) {
-    $controller = new userController();
-    $controller->deleteUser($params);
-});
-
-// Login de usuario
-$router->post('/login', function () {
-    $controller = new userController();
-    $controller->loginUser();
-});
-
-// register de usuario
-$router->post('/register', function () {
-    $controller = new userController();
-    $controller->createUser();
+$router->delete('/api/users/{id}', function($id){
+    $controller = new UserController();
+    $controller->deleteUser($id);
 });

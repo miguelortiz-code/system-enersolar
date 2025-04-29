@@ -120,12 +120,13 @@ CREATE TABLE users(
     second_name VARCHAR(45),
     first_surname VARCHAR(45) NOT NULL,
     second_surname VARCHAR(45),
-    image VARCHAR(255),
+    image VARCHAR(255)  DEFAULT 'user.png',
     address VARCHAR(100),
     email VARCHAR(100),
     password VARCHAR(255),
 	phone VARCHAR(80),
     token VARCHAR(255),
+    exp_token VARCHAR(255),
     method VARCHAR(255),
     id_rol INT NOT NULL DEFAULT 4,
     id_state INT NOT NULL DEFAULT 1,
@@ -136,7 +137,6 @@ CREATE TABLE users(
     FOREIGN KEY (id_rol) REFERENCES roles(id_rol),
     FOREIGN KEY (id_state) REFERENCES states(id_state)
 );
-
 -- ===================================================
 -- DUMPING DATA INTO THE USERS TABLE
 -- ===================================================
@@ -166,9 +166,8 @@ CREATE TABLE products(
     code_product VARCHAR(255),
     name VARCHAR(150) NOT NULL,
     description TEXT,
-    image VARCHAR(255),
+    image VARCHAR(255) DEFAULT 'product.png',
     slug VARCHAR(100) NOT NULL,
-    stock INT NOT NULL,
     price INT NOT NULL,
     id_category INT NOT NULL,
     id_state INT NOT NULL DEFAULT 1,
@@ -182,14 +181,28 @@ CREATE TABLE products(
 -- ===================================================
 -- DUMPING DATA INTO THE PRODUCTS TABLE
 -- ===================================================
-INSERT INTO products (code_product, name, description, image, slug, stock, price, id_category, id_state) VALUES
-('1001', 'Panel Solar 100W', 'Panel Solar de 100W', 'panel-solar-100W.jpg', 'panel-solar', 10, 800000, 1,1),
-('2001', 'Regulador Solar 100W', 'Regulador Solar de 100W', 'regulador-100W.jpg', 'regulador-100w', 10, 300000, 2, 1),
-('7001', 'Kit Solar 100W', 'Kit Solar de 100W', 'kit-solar-100W.jpg', 'kit-solar', 10, 5800000, 7, 1);
+INSERT INTO products (code_product, name, description, image, slug, price, id_category, id_state) VALUES
+('1001', 'Panel Solar 100W', 'Panel Solar de 100W', 'panel-solar-100W.jpg', 'panel-solar', 800000, 1,1),
+('2001', 'Regulador Solar 100W', 'Regulador Solar de 100W', 'regulador-100W.jpg', 'regulador-100w', 300000, 2, 1),
+('7001', 'Kit Solar 100W', 'Kit Solar de 100W', 'kit-solar-100W.jpg', 'kit-solar', 5800000, 7, 1);
 
 -- ========================  --
--- CREATED TABLE FEATURES PRODUCTS --
+-- CREATED TABLE INVENTORIES --
 -- ========================  --
+CREATE TABLE inventories(
+	id_inventory INT NOT NULL AUTO_INCREMENT,
+	id_product INT,
+    stock INT NOT NULL,
+	date_entry TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    location VARCHAR (100) DEFAULT NULL,
+	PRIMARY KEY(id_inventory),
+    FOREIGN KEY (id_product) REFERENCES products(id_product)
+);
+
+
+-- ================================
+-- CREATED TABLE FEATURES PRODUCTS
+-- ================================
 CREATE TABLE feature_products(
 	id INT NOT NULL AUTO_INCREMENT,
     feature VARCHAR(50),
